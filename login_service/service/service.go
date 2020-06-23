@@ -17,6 +17,9 @@ import (
 	"google.golang.org/grpc"
 )
 
+const LoginSuccess = 0
+const LoginFailed = 1
+
 // server is used to implement helloworld.GreeterServer.
 type server struct {
 	userlogin.UnimplementedGreeterServer
@@ -89,7 +92,7 @@ func login(in *userlogin.LoginRequest) (string, error) {
 	}
 	tokenInfo.Token = tokenOne + "." + tokenTwo
 
-	err = cache.AddToken(&tokenInfo)
+	err = cache.UpdateToken(&tokenInfo)
 	if err != nil {
 		seelog.Errorf("add failed, err:%v", err)
 		return "", err
@@ -106,11 +109,11 @@ func parseToken(in *userlogin.TokenCheckRequest) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	seelog.Info(userId)
 	return userId, nil
 }
 func (s *server) TokenCheck(ctx context.Context, in *userlogin.TokenCheckRequest) (*userlogin.TokenCheckReply, error) {
-	seelog.Infof("Received: %v", in)
-	var flag int32
+	var flag int32 = LoginFailed
 	userId, err := parseToken(in)
 	if err != nil {
 		return nil, err
@@ -119,13 +122,14 @@ func (s *server) TokenCheck(ctx context.Context, in *userlogin.TokenCheckRequest
 	if err != nil {
 		return nil, err
 	}
-	if tokenTmp.Token == in.Token {
-		flag = 1
+	if tokenTmp.Token == in.Token && tokenTmp.ExpireTime > time.Now().Unix() {
+		flag = LoginSuccess
 	}
-	if tokenTmp.ExpireTime < time.Now().Unix() {
-		flag = 0
+	err = cache.UpdateToken(tokenTmp)
+	if err != nil {
+		seelog.Errorf("updage failed, err:%v", err)
+		return nil, err
 	}
-	seelog.Info(flag)
 	return &userlogin.TokenCheckReply{Flag: flag}, nil
 }
 

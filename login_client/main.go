@@ -20,7 +20,9 @@ func main() {
 	fmt.Println("enter 'Register' to register account")
 	fmt.Println("enter 'Login' to Login account")
 	fmt.Println("enter 'quit' to Logout account")
+	fmt.Println("enter 'getu' to get user login info")
 	fmt.Println("**************************************")
+	userInfo.InitField()
 	userInfo.UserAction()
 
 }

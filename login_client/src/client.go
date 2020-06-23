@@ -7,7 +7,6 @@ import (
 
 	"github.com/changgong1/userlogin-go/login_client/config"
 	lg "github.com/changgong1/userlogin-go/login_guide"
-	"github.com/cihub/seelog"
 	"google.golang.org/grpc"
 )
 
@@ -17,8 +16,8 @@ const GreeterOut = "out"
 const GreeterTokenCheck = "tokenCheck"
 const GreeterQuit = "quit"
 const GetUserInfo = "getu"
-const LoginStatusOut = 0
-const LoginStatusSuccess = 1
+const LoginStatusOut = 1
+const LoginStatusSuccess = 0
 
 var gLoginClient *LoginClient
 
@@ -28,8 +27,9 @@ func NewLoginClient() error {
 	ctx1, cel := context.WithTimeout(context.Background(), time.Second*1)
 	defer cel()
 	conn, err := grpc.DialContext(ctx1, config.AppConfig.Addr, grpc.WithBlock(), grpc.WithInsecure())
+	// seelog.Errorf("did not connect: %v", err)
 	if err != nil {
-		seelog.Error("did not connect: %v", err)
+		fmt.Println("did not connect: ", err)
 		return err
 	}
 	c.conn = conn

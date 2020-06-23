@@ -6,7 +6,6 @@ import (
 	"time"
 
 	lg "github.com/changgong1/userlogin-go/login_guide"
-	"github.com/cihub/seelog"
 )
 
 type UserLoginModel struct {
@@ -16,11 +15,14 @@ type UserLoginModel struct {
 	Status  int
 }
 
+func (u *UserLoginModel) InitField() {
+	u.Status = LoginStatusOut
+}
 func (u *UserLoginModel) CheckGreeter() (bool, error) {
 	if u.Greeter == GreeterQuit {
 		return true, nil
 	}
-	if u.Greeter != GreeterRegister || u.Greeter == GreeterLogin || u.Greeter != GetUserInfo {
+	if u.Greeter == GreeterRegister || u.Greeter == GreeterLogin || u.Greeter == GetUserInfo {
 		return false, nil
 	}
 
@@ -51,9 +53,8 @@ func (u *UserLoginModel) ExecGreeter() error {
 		}
 		u.Token = token
 		u.Status = LoginStatusSuccess
-
-		go u.TokenCheck()
 	}
+	go u.TokenCheck()
 	return nil
 }
 
@@ -103,8 +104,7 @@ func (u *UserLoginModel) TokenCheck() {
 		time.Sleep(3 * time.Second)
 		in := &lg.TokenCheckRequest{Token: u.Token}
 		b, err := gLoginClient.TokenCheck(in)
-		seelog.Info(b, err)
-		if b == 0 || err != nil {
+		if b == LoginStatusOut || err != nil {
 			u.LoginOut()
 			return
 		}
@@ -139,7 +139,6 @@ func (u *UserLoginModel) UserAction() {
 				break
 			}
 			if err != nil {
-				fmt.Print("please enter register, login or quit:")
 				continue
 			}
 			if u.Greeter == GetUserInfo {

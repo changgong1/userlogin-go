@@ -33,9 +33,9 @@ func NewRedisClient() error {
 type TokenInfo struct {
 	Token      string `json:"token"`
 	UserId     string //`json:"user_id"`
-	DeviceId   string //`json:"device_id"`
+	DeviceId   string `json:"device_id"`
 	LoginTime  int64  //`json:"login_time"`
-	ExpireTime int64  //`json:"expire_time"`
+	ExpireTime int64  `json:"expire_time"`
 }
 
 func (t *TokenInfo) CheckTokenFeild() error {
@@ -45,7 +45,7 @@ func (t *TokenInfo) CheckTokenFeild() error {
 	return nil
 }
 
-func AddToken(tokenInfo *TokenInfo) error {
+func UpdateToken(tokenInfo *TokenInfo) error {
 	err := tokenInfo.CheckTokenFeild()
 	if err != nil {
 		return err
