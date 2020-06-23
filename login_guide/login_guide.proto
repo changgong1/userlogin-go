@@ -1,0 +1,33 @@
+syntax = "proto3";
+
+// option java_multiple_files = true;
+// option java_package = "io.grpc.examples.userlogin";
+// option java_outer_classname = "UserLoginProto";
+
+package userlogin;
+
+// The greeting service definition.
+service Greeter {
+  // Sends a greeting
+  rpc UserRegister (LoginRequest) returns (TokenReply) {}
+  rpc UserLogin (LoginRequest) returns (TokenReply) {}
+  rpc TokenCheck (TokenCheckRequest) returns (TokenCheckReply) {}
+}
+
+// The request message containing the user's name.
+message LoginRequest {
+  string userId = 1;
+  string password = 2;
+  string deviceId = 3;
+  string signature = 4;
+}
+message TokenReply {
+  string token = 2;
+}
+
+message TokenCheckRequest {
+  string token = 1;
+}
+message TokenCheckReply {
+  int32 flag = 1;
+}
