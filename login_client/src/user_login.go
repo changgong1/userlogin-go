@@ -22,7 +22,7 @@ func (u *UserLoginModel) CheckGreeter() (bool, error) {
 	if u.Greeter == GreeterQuit {
 		return true, nil
 	}
-	if u.Greeter == GreeterRegister || u.Greeter == GreeterLogin || u.Greeter == GetUserInfo {
+	if u.Greeter == GreeterRegister || u.Greeter == GreeterStreamLogin || u.Greeter == GreeterLogin || u.Greeter == GetUserInfo {
 		return false, nil
 	}
 
@@ -48,6 +48,18 @@ func (u *UserLoginModel) ExecGreeter() error {
 		}
 
 		token, err := gLoginClient.Login(in)
+		if err != nil {
+			return err
+		}
+		u.Token = token
+		u.Status = LoginStatusSuccess
+	} else if u.Greeter == GreeterStreamLogin {
+		in, err := u.loginOrRegisterParam()
+		if err != nil {
+			return nil
+		}
+
+		token, err := gLoginClient.StreamLogin(in)
 		if err != nil {
 			return err
 		}

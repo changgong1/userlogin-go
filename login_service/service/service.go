@@ -66,6 +66,53 @@ func (s *server) UserLogin(ctx context.Context, in *userlogin.LoginRequest) (*us
 	}
 	return &userlogin.TokenReply{Token: token}, nil
 }
+
+type streamService struct {
+	userlogin.UnimplementedStreamGreeterServer
+}
+
+func (s *streamService) StreamUserLogin(in userlogin.StreamGreeter_StreamUserLoginServer) error {
+	var onece string
+	var tokenChan, oneceChan chan string
+	go func() {
+		i := 0
+		for {
+			data, err := in.Recv()
+			if err != nil {
+				return
+			}
+			seelog.Info(data)
+			if i == 0 {
+				onece = utils.GetRandomString(18)
+				oneceChan <- onece
+			} else {
+				loginRegister := userlogin.LoginRequest{
+					UserId:   data.UserId,
+					DeviceId: data.DeviceId,
+					Onece:    data.Onece,
+					Password: data.Password,
+				}
+				token, err := login(&loginRegister)
+				if err != nil {
+					seelog.Errorf("login failed")
+				}
+				tokenChan <- token
+				break
+			}
+			i++
+		}
+	}()
+	select {
+	case onece := <-oneceChan:
+		reply := userlogin.TokenReply{Token: onece}
+		in.Send(&reply)
+	case token := <-tokenChan:
+		reply := userlogin.TokenReply{Token: token}
+		in.Send(&reply)
+	}
+	return nil
+}
+
 func chekcPassword(passworChar, passwordFactor, password string) bool {
 	tmpChar := utils.HmacSha256(password+passwordFactor, config.AppConfig.PwdSecret)
 
@@ -134,15 +181,30 @@ func (s *server) TokenCheck(ctx context.Context, in *userlogin.TokenCheckRequest
 }
 
 func Start() {
-	seelog.Infof("login_service start")
-
-	lis, err := net.Listen("tcp", config.AppConfig.Addr)
-	if err != nil {
-		seelog.Errorf("failed to listen: %v", err)
-	}
-	s := grpc.NewServer()
-	userlogin.RegisterGreeterServer(s, &server{})
-	if err := s.Serve(lis); err != nil {
-		seelog.Errorf("failed to serve: %v", err)
-	}
+	go func() {
+		seelog.Infof("login_service start")
+		lis, err := net.Listen("tcp", config.AppConfig.Addr)
+		if err != nil {
+			seelog.Errorf("failed to listen: %v", err)
+		}
+		s := grpc.NewServer()
+		userlogin.RegisterGreeterServer(s, &server{})
+		if err := s.Serve(lis); err != nil {
+			seelog.Errorf("failed to serve: %v", err)
+		}
+		seelog.Infof("login_service end")
+	}()
+	go func() {
+		seelog.Infof("login_service stream start")
+		lis, err := net.Listen("tcp", config.AppConfig.StreamAddr)
+		if err != nil {
+			seelog.Errorf("failed to listen: %v", err)
+		}
+		s := grpc.NewServer()
+		userlogin.RegisterStreamGreeterServer(s, &streamService{})
+		if err := s.Serve(lis); err != nil {
+			seelog.Errorf("failed to serve: %v", err)
+		}
+		seelog.Infof("login_service stream end")
+	}()
 }

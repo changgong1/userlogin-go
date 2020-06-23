@@ -8,6 +8,7 @@ var AppConfig Config
 
 type Config struct {
 	Addr            string
+	StreamAddr      string
 	DB              db.DBConfig
 	PwdSecret       string
 	TokenSecret     string

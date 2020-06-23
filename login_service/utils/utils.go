@@ -25,6 +25,12 @@ func GetRandomString(n int) string {
 	}
 	return string(result)
 }
+func Sha256(text string) string {
+	h := sha256.New()
+	h.Write([]byte(text))
+	bs := h.Sum(nil)
+	return string(bs)
+}
 
 func HmacSha256(text, secret string) string {
 	key := []byte(secret)

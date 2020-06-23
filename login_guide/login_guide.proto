@@ -13,16 +13,20 @@ service Greeter {
   rpc UserLogin (LoginRequest) returns (TokenReply) {}
   rpc TokenCheck (TokenCheckRequest) returns (TokenCheckReply) {}
 }
-
+service StreamGreeter{
+  rpc StreamUserLogin (stream LoginRequest) returns (stream TokenReply) {}
+}
 // The request message containing the user's name.
 message LoginRequest {
   string userId = 1;
   string password = 2;
   string deviceId = 3;
-  string signature = 4;
+  string onece = 4;
+  string signature = 5;
 }
+
 message TokenReply {
-  string token = 2;
+  string token = 1;
 }
 
 message TokenCheckRequest {
