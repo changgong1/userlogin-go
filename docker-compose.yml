@@ -1,0 +1,46 @@
+
+            
+version: '3.1'
+services:
+  grpctiny:
+    build: ./login_service
+    ports:
+      - "50051:8080"
+      - "50052:9090"
+    depends_on:
+      - db
+      - redis
+    restart: always
+    networks:
+        - default
+
+  db:
+    # 目前 latest 版本为 MySQL8.x
+    image: mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: 123456
+    command:
+      --default-authentication-plugin=mysql_native_password
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_general_ci
+      --explicit_defaults_for_timestamp=true
+      --lower_case_table_names=1
+    ports:
+      - 4406:3306
+    volumes:
+      - ./data:/var/lib/mysql
+  redis:
+    hostname: redis
+    image: redis:5.0.4
+    container_name: redis
+    restart: unless-stopped
+    command: redis-server /etc/redis.conf # 启动redis命令
+    environment:
+      - TZ=Asia/Shanghai
+    volumes:
+      #- /etc/localtime:/etc/localtime:ro # 设置容器时区与宿主机保持一致
+      - ./redis/data:/data
+      - ./redis/redis.conf:/etc/redis.conf
+    ports:
+       - "6679:6379"
