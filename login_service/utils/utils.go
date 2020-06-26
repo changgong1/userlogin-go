@@ -10,13 +10,18 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"io"
 	mr "math/rand"
+	"strconv"
+	"strings"
 	"time"
+
+	"golang.org/x/crypto/pbkdf2"
 )
 
 func GetRandomString(n int) string {
-	str := "0123456789abcdefghijklmnopqrstuvwxyz"
+	str := "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 	bytes := []byte(str)
 	result := []byte{}
 	r := mr.New(mr.NewSource(time.Now().UnixNano()))
@@ -30,6 +35,42 @@ func Sha256(text string) string {
 	h.Write([]byte(text))
 	bs := h.Sum(nil)
 	return string(bs)
+}
+
+func DjangoEncode(passsword, salt string, iterations int) (string, error) {
+	if iterations <= 0 {
+		iterations = 10000
+	}
+	if salt == "" {
+		salt = GetRandomString(12)
+	}
+	// 盐中不包含美元$符号
+	if strings.Contains(salt, "$") {
+		return "", errors.New("salt contains dollar sign ($)")
+	}
+	hash := pbkdf2.Key([]byte(passsword), []byte(salt), iterations, sha256.Size, sha256.New)
+	b64Hash := base64.StdEncoding.EncodeToString(hash)
+	return fmt.Sprintf("%s$%d$%s$%s", "pbkdf2_sha256", iterations, salt, b64Hash), nil
+}
+
+func CheckDjangoPasswrod(inAlgorithm, password string, strEncoded string) (bool, error) {
+	s := strings.Split(strEncoded, "$")
+	if len(s) != 4 {
+		return false, errors.New("hashed password components mismatch")
+	}
+	algorithm, iterations, salt := s[0], s[1], s[2]
+	if inAlgorithm != algorithm {
+		return false, errors.New("algorithm mismatch")
+	}
+	i, err := strconv.Atoi(iterations)
+	if err != nil {
+		return false, errors.New("unreadable component in hashed password")
+	}
+	newStrEncoded, err := DjangoEncode(password, salt, i)
+	if err != nil {
+		return false, err
+	}
+	return hmac.Equal([]byte(newStrEncoded), []byte(strEncoded)), nil
 }
 
 func HmacSha256(text, secret string) string {

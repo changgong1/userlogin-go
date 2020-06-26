@@ -36,9 +36,14 @@ func (s *server) UserRegister(ctx context.Context, in *userlogin.LoginRequest) (
 	}
 	userInfo = &db.UserInfo{}
 	userInfo.UserId = in.UserId
-	userInfo.PasswordFactor = utils.GetRandomString(config.AppConfig.FactorLangth)
-	userInfo.PasswordChar = utils.HmacSha256(in.Password+userInfo.PasswordFactor, config.AppConfig.PwdSecret)
+	// userInfo.PasswordFactor = utils.GetRandomString(config.AppConfig.FactorLangth)
+	// userInfo.PasswordChar = utils.HmacSha256(in.Password+userInfo.PasswordFactor, config.AppConfig.PwdSecret)
+	userInfo.PasswordChar, err = utils.DjangoEncode(in.Password, "", config.AppConfig.DjangoIterations)
+	if err != nil {
+		return nil, err
+	}
 
+	// 保存用户信息：用户ID，密码算子（盐），密码检查符。
 	effect, err := userInfo.AddUserInfo()
 	if err != nil || effect != 1 {
 		return nil, err
@@ -57,9 +62,12 @@ func (s *server) UserLogin(ctx context.Context, in *userlogin.LoginRequest) (*us
 	if err != nil || userInfo == nil {
 		return nil, errors.New("login failed")
 	}
-	if !chekcPassword(userInfo.PasswordChar, userInfo.PasswordFactor, in.Password) {
+	if b, err := utils.CheckDjangoPasswrod(config.AppConfig.DjangoAlgorithm, in.Password, userInfo.PasswordChar); !b || err != nil {
 		return nil, errors.New("password is invalid")
 	}
+	// if !chekcPassword(userInfo.PasswordChar, userInfo.PasswordFactor, in.Password) {
+	// 	return nil, errors.New("password is invalid")
+	// }
 	token, err := login(in)
 	if err != nil {
 		return nil, errors.New("login failed")
