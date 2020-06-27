@@ -14,7 +14,12 @@ service Greeter {
   rpc TokenCheck (TokenCheckRequest) returns (TokenCheckReply) {}
 }
 service StreamGreeter{
-  rpc StreamUserLogin (stream LoginRequest) returns (stream TokenReply) {}
+  rpc StreamUserLogin (stream LoginStreamRequest) returns (stream TokenReply) {}
+}
+
+message LoginStreamRequest {
+  string type = 1;
+  LoginRequest param = 2;
 }
 // The request message containing the user's name.
 message LoginRequest {
@@ -32,6 +37,7 @@ message TokenReply {
 message TokenCheckRequest {
   string token = 1;
 }
+
 message TokenCheckReply {
   int32 flag = 1;
 }

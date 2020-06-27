@@ -34,7 +34,7 @@ func Sha256(text string) string {
 	h := sha256.New()
 	h.Write([]byte(text))
 	bs := h.Sum(nil)
-	return string(bs)
+	return fmt.Sprintf("%x\r\n", string(bs))
 }
 
 func DjangoEncode(passsword, salt string, iterations int) (string, error) {

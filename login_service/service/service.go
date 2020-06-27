@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net"
 	"strings"
 	"time"
@@ -25,8 +26,10 @@ type server struct {
 	userlogin.UnimplementedGreeterServer
 }
 
+// 用户注册
 func (s *server) UserRegister(ctx context.Context, in *userlogin.LoginRequest) (*userlogin.TokenReply, error) {
 	seelog.Infof("Received: %v", in)
+	// 检查用户是否注册过
 	userInfo, err := db.GetUserInfoByUserId(in.UserId)
 	if err != nil || userInfo != nil {
 		if userInfo != nil {
@@ -36,8 +39,6 @@ func (s *server) UserRegister(ctx context.Context, in *userlogin.LoginRequest) (
 	}
 	userInfo = &db.UserInfo{}
 	userInfo.UserId = in.UserId
-	// userInfo.PasswordFactor = utils.GetRandomString(config.AppConfig.FactorLangth)
-	// userInfo.PasswordChar = utils.HmacSha256(in.Password+userInfo.PasswordFactor, config.AppConfig.PwdSecret)
 	userInfo.PasswordChar, err = utils.DjangoEncode(in.Password, "", config.AppConfig.DjangoIterations)
 	if err != nil {
 		return nil, err
@@ -48,6 +49,7 @@ func (s *server) UserRegister(ctx context.Context, in *userlogin.LoginRequest) (
 	if err != nil || effect != 1 {
 		return nil, err
 	}
+	// 注册后登陆
 	token, err := login(in)
 	if err != nil {
 		return nil, err
@@ -56,18 +58,21 @@ func (s *server) UserRegister(ctx context.Context, in *userlogin.LoginRequest) (
 	return &userlogin.TokenReply{Token: token}, nil
 }
 
+// 用户登陆
 func (s *server) UserLogin(ctx context.Context, in *userlogin.LoginRequest) (*userlogin.TokenReply, error) {
 	seelog.Infof("Received: %v", in)
+	// 检查用户是否注册
 	userInfo, err := db.GetUserInfoByUserId(in.UserId)
 	if err != nil || userInfo == nil {
 		return nil, errors.New("login failed")
 	}
+
+	// 校验密码
 	if b, err := utils.CheckDjangoPasswrod(config.AppConfig.DjangoAlgorithm, in.Password, userInfo.PasswordChar); !b || err != nil {
 		return nil, errors.New("password is invalid")
 	}
-	// if !chekcPassword(userInfo.PasswordChar, userInfo.PasswordFactor, in.Password) {
-	// 	return nil, errors.New("password is invalid")
-	// }
+
+	// 生成token
 	token, err := login(in)
 	if err != nil {
 		return nil, errors.New("login failed")
@@ -75,13 +80,43 @@ func (s *server) UserLogin(ctx context.Context, in *userlogin.LoginRequest) (*us
 	return &userlogin.TokenReply{Token: token}, nil
 }
 
+// token检查
+func (s *server) TokenCheck(ctx context.Context, in *userlogin.TokenCheckRequest) (*userlogin.TokenCheckReply, error) {
+	var flag int32 = LoginFailed
+	// 解析传入的token
+	userId, err := parseToken(in)
+	if err != nil {
+		return nil, err
+	}
+
+	// 根据用户获取redis存储的token
+	tokenTmp, err := cache.GetToken(userId)
+	if err != nil {
+		return nil, err
+	}
+	// 判断传入的token是否与缓存一致，变检查token是否超时
+	if tokenTmp.Token == in.Token && tokenTmp.ExpireTime > time.Now().Unix() {
+		flag = LoginSuccess
+	}
+
+	// 检查通过相应的延长token过期时间（该功能满足用户长期登陆）
+	err = cache.UpdateToken(tokenTmp)
+	if err != nil {
+		seelog.Errorf("updage failed, err:%v", err)
+		return nil, err
+	}
+	return &userlogin.TokenCheckReply{Flag: flag}, nil
+}
+
+// stream双向流
 type streamService struct {
 	userlogin.UnimplementedStreamGreeterServer
 }
 
 func (s *streamService) StreamUserLogin(in userlogin.StreamGreeter_StreamUserLoginServer) error {
 	var onece string
-	var tokenChan, oneceChan chan string
+	tokenChan := make(chan string)
+	oneceChan := make(chan string)
 	go func() {
 		i := 0
 		for {
@@ -89,16 +124,18 @@ func (s *streamService) StreamUserLogin(in userlogin.StreamGreeter_StreamUserLog
 			if err != nil {
 				return
 			}
-			seelog.Info(data)
-			if i == 0 {
+			seelog.Info(i, data)
+			if data.Type == "onece" {
 				onece = utils.GetRandomString(18)
+				seelog.Info("set oneceChan")
 				oneceChan <- onece
 			} else {
+				seelog.Info("set tokenchan two")
 				loginRegister := userlogin.LoginRequest{
-					UserId:   data.UserId,
-					DeviceId: data.DeviceId,
-					Onece:    data.Onece,
-					Password: data.Password,
+					UserId:   data.Param.UserId,
+					DeviceId: data.Param.DeviceId,
+					Onece:    data.Param.Onece,
+					Password: data.Param.Password,
 				}
 				token, err := login(&loginRegister)
 				if err != nil {
@@ -110,23 +147,30 @@ func (s *streamService) StreamUserLogin(in userlogin.StreamGreeter_StreamUserLog
 			i++
 		}
 	}()
+
 	select {
 	case onece := <-oneceChan:
+		seelog.Info("tokenReply: onece", onece)
 		reply := userlogin.TokenReply{Token: onece}
 		in.Send(&reply)
+	case <-time.After(1 * time.Second):
+		fmt.Println("login onece time out")
+		break
+	}
+
+	seelog.Info("tokenReply: token", in)
+	select {
 	case token := <-tokenChan:
 		reply := userlogin.TokenReply{Token: token}
 		in.Send(&reply)
+		// case <-time.After(2 * time.Second):
+		// 	fmt.Println("login token time out")
+		// 	break
 	}
 	return nil
 }
 
-func chekcPassword(passworChar, passwordFactor, password string) bool {
-	tmpChar := utils.HmacSha256(password+passwordFactor, config.AppConfig.PwdSecret)
-
-	return tmpChar == passworChar
-}
-
+// 登陆
 func login(in *userlogin.LoginRequest) (string, error) {
 	now := time.Now().Unix()
 	tokenInfo := cache.TokenInfo{
@@ -154,6 +198,8 @@ func login(in *userlogin.LoginRequest) (string, error) {
 	}
 	return tokenInfo.Token, nil
 }
+
+// 解析token
 func parseToken(in *userlogin.TokenCheckRequest) (string, error) {
 	tokenList := strings.Split(in.Token, ".")
 	if len(tokenList) != 2 {
@@ -164,30 +210,11 @@ func parseToken(in *userlogin.TokenCheckRequest) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	seelog.Info(userId)
+
 	return userId, nil
 }
-func (s *server) TokenCheck(ctx context.Context, in *userlogin.TokenCheckRequest) (*userlogin.TokenCheckReply, error) {
-	var flag int32 = LoginFailed
-	userId, err := parseToken(in)
-	if err != nil {
-		return nil, err
-	}
-	tokenTmp, err := cache.GetToken(userId)
-	if err != nil {
-		return nil, err
-	}
-	if tokenTmp.Token == in.Token && tokenTmp.ExpireTime > time.Now().Unix() {
-		flag = LoginSuccess
-	}
-	err = cache.UpdateToken(tokenTmp)
-	if err != nil {
-		seelog.Errorf("updage failed, err:%v", err)
-		return nil, err
-	}
-	return &userlogin.TokenCheckReply{Flag: flag}, nil
-}
 
+// 启动服务
 func Start() {
 	go func() {
 		seelog.Infof("login_service start")

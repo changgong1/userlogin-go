@@ -58,8 +58,11 @@ func (u *UserLoginModel) ExecGreeter() error {
 		if err != nil {
 			return nil
 		}
-
-		token, err := gLoginClient.StreamLogin(in)
+		inUser := &lg.LoginStreamRequest{
+			Type:  u.Greeter,
+			Param: in,
+		}
+		token, err := gLoginClient.StreamLogin(inUser)
 		if err != nil {
 			return err
 		}

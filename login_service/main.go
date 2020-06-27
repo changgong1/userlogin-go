@@ -19,7 +19,7 @@ func main() {
 	if err != nil {
 		return
 	}
-
+	// 启动服务
 	service.Start()
 
 	InitSignal()

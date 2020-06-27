@@ -10,6 +10,7 @@ import (
 	"github.com/changgong1/userlogin-go/login_client/config"
 	lg "github.com/changgong1/userlogin-go/login_guide"
 	"github.com/changgong1/userlogin-go/login_service/utils"
+	"github.com/cihub/seelog"
 	"google.golang.org/grpc"
 )
 
@@ -84,7 +85,7 @@ func (l *LoginClient) Login(in *lg.LoginRequest) (string, error) {
 	return r.GetToken(), nil
 }
 
-func (l *LoginClient) StreamLogin(in *lg.LoginRequest) (string, error) {
+func (l *LoginClient) StreamLogin(in *lg.LoginStreamRequest) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), config.AppConfig.ReqTimeOut*time.Second)
 	defer cancel()
 	recv, err := l.StreamGreeterClient.StreamUserLogin(ctx)
@@ -92,37 +93,52 @@ func (l *LoginClient) StreamLogin(in *lg.LoginRequest) (string, error) {
 		fmt.Println(err)
 		return "", err
 	}
-	var token, onece chan string
+	tokenChan := make(chan string)
+	oneceChan := make(chan string)
+	// 发送流
+	go func() {
+		for {
+			seelog.Info(in)
+			in.Type = "onece"
+			recv.Send(in)
+			break
+		}
+	}()
 	// 接受流
 	go func() {
 		i := 0
 		for {
+			// if err == io.EOF {
+			// 	return
+			// }
 			reply, err := recv.Recv()
 			if err != nil {
 				fmt.Println(err)
 				return
 			}
 			if i == 0 {
-				onece <- reply.Token
+				oneceChan <- reply.Token
 			} else {
-				token <- reply.Token
+				tokenChan <- reply.Token
 				break
 			}
 			i++
 		}
 	}()
 
-	// 发送流
+	// 发送第二次流
+	seelog.Info(in)
 	select {
-	case o := <-onece:
-		in.Onece = o
+	case <-oneceChan:
 		signStr, err := json.Marshal(in)
 		if err != nil {
 			fmt.Println(err)
 		}
-		in.Signature = utils.Sha256(string(signStr))
-		in.Onece = ""
+		in.Param.Signature = utils.Sha256(string(signStr))
+		in.Type = ""
+		fmt.Println("send in two:", in)
 		recv.Send(in)
+
 		break
 	case <-time.After(config.AppConfig.ReqTimeOut * time.Second):
 		fmt.Println("login time out")
@@ -132,8 +148,8 @@ func (l *LoginClient) StreamLogin(in *lg.LoginRequest) (string, error) {
 	// 结束
 	t := ""
 	select {
-	case t = <-token:
-		break
+	case t = <-tokenChan:
+		fmt.Println(t)
 	case <-time.After(config.AppConfig.ReqTimeOut * time.Second):
 		return "", errors.New("login time out")
 	}

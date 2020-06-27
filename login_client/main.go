@@ -17,8 +17,9 @@ func main() {
 	InitLog()
 
 	fmt.Println("************ userlogin ***************")
-	fmt.Println("enter 'Register' to register account")
-	fmt.Println("enter 'Login' to Login account")
+	fmt.Println("enter 'register' to register account")
+	fmt.Println("enter 'login' to Login account")
+	fmt.Println("enter 'streamlogin' to stream Login account")
 	fmt.Println("enter 'quit' to Logout account")
 	fmt.Println("enter 'getu' to get user login info")
 	fmt.Println("**************************************")
