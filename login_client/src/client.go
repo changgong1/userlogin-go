@@ -10,7 +10,6 @@ import (
 	"github.com/changgong1/userlogin-go/login_client/config"
 	lg "github.com/changgong1/userlogin-go/login_guide"
 	"github.com/changgong1/userlogin-go/login_service/utils"
-	"github.com/cihub/seelog"
 	"google.golang.org/grpc"
 )
 
@@ -32,7 +31,6 @@ func NewLoginClient() error {
 	ctx1, cel := context.WithTimeout(context.Background(), config.AppConfig.ReqTimeOut*time.Second)
 	defer cel()
 	conn, err := grpc.DialContext(ctx1, config.AppConfig.Addr, grpc.WithBlock(), grpc.WithInsecure())
-	// seelog.Errorf("did not connect: %v", err)
 	if err != nil {
 		fmt.Println("did not connect: ", config.AppConfig.Addr, err)
 		return err
@@ -68,7 +66,6 @@ func (l *LoginClient) Register(in *lg.LoginRequest) (string, error) {
 	defer cancel()
 	r, err := l.GreeterClient.UserRegister(ctx, in)
 	if err != nil {
-		// seelog.Error("could not greet: %v", err)
 		return "", err
 	}
 	return r.GetToken(), nil
@@ -98,7 +95,6 @@ func (l *LoginClient) StreamLogin(in *lg.LoginStreamRequest) (string, error) {
 	// 发送流
 	go func() {
 		for {
-			seelog.Info(in)
 			in.Type = "onece"
 			recv.Send(in)
 			break
@@ -108,9 +104,6 @@ func (l *LoginClient) StreamLogin(in *lg.LoginStreamRequest) (string, error) {
 	go func() {
 		i := 0
 		for {
-			// if err == io.EOF {
-			// 	return
-			// }
 			reply, err := recv.Recv()
 			if err != nil {
 				fmt.Println(err)
@@ -127,7 +120,6 @@ func (l *LoginClient) StreamLogin(in *lg.LoginStreamRequest) (string, error) {
 	}()
 
 	// 发送第二次流
-	seelog.Info(in)
 	select {
 	case <-oneceChan:
 		signStr, err := json.Marshal(in)
@@ -138,7 +130,6 @@ func (l *LoginClient) StreamLogin(in *lg.LoginStreamRequest) (string, error) {
 		in.Type = ""
 		fmt.Println("send in two:", in)
 		recv.Send(in)
-
 		break
 	case <-time.After(config.AppConfig.ReqTimeOut * time.Second):
 		fmt.Println("login time out")

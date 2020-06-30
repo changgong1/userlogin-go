@@ -10,3 +10,4 @@ pwdsecret: EV3KI$a12DAHWAda
 factorlangth: 8
 tokensecret: M976*fdaeQWdse2W
 tokenexpiretime: 6000
+djangoalgorithm: pbkdf2_sha256

@@ -66,9 +66,10 @@ func (s *server) UserLogin(ctx context.Context, in *userlogin.LoginRequest) (*us
 	if err != nil || userInfo == nil {
 		return nil, errors.New("login failed")
 	}
-
+	seelog.Info(userInfo)
 	// 校验密码
 	if b, err := utils.CheckDjangoPasswrod(config.AppConfig.DjangoAlgorithm, in.Password, userInfo.PasswordChar); !b || err != nil {
+		seelog.Error(err)
 		return nil, errors.New("password is invalid")
 	}
 

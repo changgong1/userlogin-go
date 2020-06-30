@@ -15,8 +15,8 @@ type UserInfo struct {
 }
 
 func (u *UserInfo) CheckField() error {
-	if u.UserId == "" || u.PasswordFactor == "" || u.PasswordFactor == "" {
-		seelog.Errorf("user info aren't enough")
+	if u.UserId == "" || u.PasswordChar == "" {
+		seelog.Error("user info aren't enough")
 		return errors.New("user info aren't enough")
 	}
 	return nil
