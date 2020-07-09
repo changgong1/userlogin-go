@@ -15,14 +15,19 @@ import (
 )
 
 func main() {
+	seelog.Error("hello world")
 	err := InitLog()
 	if err != nil {
+		seelog.Error(err)
 		return
 	}
 	// 启动服务
 	service.Start()
+	seelog.Error("hello world 2")
 
 	InitSignal()
+
+	// seelog.Error("hello world 3")
 }
 
 func InitLog() error {
